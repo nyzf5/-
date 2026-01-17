@@ -1,0 +1,455 @@
+-- Painel de Controle para Hitbox com DETECÇÃO PERFEITA
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+
+-- Variáveis
+local ativo = false
+local torsoOriginal
+local tamanhoHitbox = 15 -- Começar no 15 como recomendado
+local painelArrastando = false
+local offsetMouse = nil
+
+-- =========== ANIMAÇÃO FADE ===========
+local function fadeInOut(texto, duracaoFade)
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "AvisoFade"
+    gui.Parent = player:WaitForChild("PlayerGui")
+    gui.ResetOnSpawn = false
+    
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0.8, 0, 0.08, 0)
+    frame.Position = UDim2.new(0.1, 0, 0.9, 0)
+    frame.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+    frame.BackgroundTransparency = 1 -- Começa transparente
+    frame.BorderSizePixel = 0
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = frame
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.Text = texto
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.BackgroundTransparency = 1
+    label.TextScaled = true
+    label.Font = Enum.Font.GothamMedium
+    
+    label.Parent = frame
+    frame.Parent = gui
+    
+    -- Fade In
+    local fadeIn = TweenService:Create(frame, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        BackgroundTransparency = 0.3
+    })
+    
+    -- Fade Out
+    local fadeOut = TweenService:Create(frame, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+        BackgroundTransparency = 1
+    })
+    
+    -- Sequência de animação
+    fadeIn:Play()
+    wait(duracaoFade)
+    fadeOut:Play()
+    
+    -- Remover após animação
+    fadeOut.Completed:Connect(function()
+        wait(0.5)
+        gui:Destroy()
+    end)
+end
+
+-- =========== MOSTRAR AVISOS SEQUENCIAIS ===========
+local function mostrarAvisosSequenciais()
+    -- Primeiro aviso após 1 segundo
+    wait(1)
+    fadeInOut("Dica 💡: use no 15 para ter melhor experiência ou pra nao acontecer bugs", 3)
+    
+    -- Segundo aviso após o primeiro sumir
+    wait(4) -- 3s do fade + 1s de intervalo
+    fadeInOut("Avisos 🚨: o script ainda está em desenvolvimento, então pode haver umas falhas.", 3)
+end
+
+-- =========== FUNÇÃO HITBOX COM DETECÇÃO REAL ===========
+local function hitbox()
+    local torso = character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso")
+    if not torso then return end
+    
+    -- Limpar conexões antigas
+    for _, conn in pairs(getconnections(torso.Touched)) do
+        conn:Disconnect()
+    end
+    
+    if ativo then
+        -- Salvar tamanho original
+        if not torsoOriginal then
+            torsoOriginal = torso.Size
+        end
+        
+        -- Remover detector antigo se existir
+        local detectorAntigo = character:FindFirstChild("DetectorHitbox")
+        if detectorAntigo then
+            detectorAntigo:Destroy()
+        end
+        
+        -- Criar uma PARTE INVISÍVEL gigante para detecção REAL
+        local detector = Instance.new("Part")
+        detector.Name = "DetectorHitbox"
+        detector.Size = Vector3.new(tamanhoHitbox, tamanhoHitbox, tamanhoHitbox)
+        detector.Transparency = 1 -- TOTALMENTE INVISÍVEL
+        detector.CanCollide = false
+        detector.Anchored = false
+        detector.CanTouch = true
+        detector.Massless = true
+        
+        -- Colar no seu corpo
+        local weld = Instance.new("Weld")
+        weld.Part0 = torso
+        weld.Part1 = detector
+        weld.C0 = CFrame.new(0, 0, 0)
+        weld.Parent = detector
+        
+        -- Parte VISÍVEL (apenas para mostrar)
+        torso.Size = Vector3.new(tamanhoHitbox, tamanhoHitbox, tamanhoHitbox)
+        torso.Transparency = 0.3 -- Mais visível agora
+        torso.Color = Color3.fromRGB(255, 0, 0)
+        
+        -- Highlight na parte visível
+        local highlight = Instance.new("Highlight")
+        highlight.Adornee = torso
+        highlight.FillColor = Color3.fromRGB(255, 50, 50)
+        highlight.FillTransparency = 0.5
+        highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
+        highlight.OutlineTransparency = 0
+        highlight.Parent = torso
+        
+        -- DETECÇÃO REAL na parte invisível
+        detector.Touched:Connect(function(hit)
+            if not ativo then return end
+            
+            local nome = hit.Name:lower()
+            local isBola = nome:find("ball") or nome:find("bola") or nome:find("soccer") or nome:find("futebol")
+            
+            -- Verificar também no parent da parte
+            if not isBola and hit.Parent then
+                local nomeParent = hit.Parent.Name:lower()
+                isBola = nomeParent:find("ball") or nomeParent:find("bola") or nomeParent:find("soccer")
+            end
+            
+            if isBola then
+                -- Calcular direção do chute baseado na posição da bola
+                local direcaoChute = (hit.Position - torso.Position).Unit
+                
+                -- Ajustar altura do chute
+                local chuteVertical = 0.5 -- Altura padrão
+                local chuteHorizontal = 0.8 -- Força horizontal
+                
+                -- Chute mais inteligente
+                local direcaoFinal = Vector3.new(
+                    direcaoChute.X * chuteHorizontal,
+                    chuteVertical,
+                    direcaoChute.Z * chuteHorizontal
+                ).Unit * 100 -- Força fixa boa
+                
+                -- Aplicar força
+                local bodyVelocity = Instance.new("BodyVelocity")
+                bodyVelocity.Velocity = direcaoFinal
+                bodyVelocity.MaxForce = Vector3.new(10000, 10000, 10000)
+                
+                -- Remover velocity antiga
+                local velAntiga = hit:FindFirstChild("BodyVelocity")
+                if velAntiga then velAntiga:Destroy() end
+                
+                bodyVelocity.Parent = hit
+                
+                -- Efeito visual
+                torso.Color = Color3.fromRGB(255, 255, 0)
+                
+                -- Som
+                local som = Instance.new("Sound")
+                som.SoundId = "rbxassetid://3570570104"
+                som.Volume = 0.6
+                som.Parent = hit
+                som:Play()
+                
+                -- Efeito na bola
+                local sparkles = Instance.new("Sparkles")
+                sparkles.Color = ColorSequence.new(Color3.fromRGB(255, 255, 0))
+                sparkles.Parent = hit
+                
+                -- Remover após tempo
+                game:GetService("Debris"):AddItem(bodyVelocity, 0.3)
+                game:GetService("Debris"):AddItem(sparkles, 0.5)
+                game:GetService("Debris"):AddItem(som, 2)
+                
+                -- Voltar cor
+                delay(0.1, function()
+                    if torso and torso.Parent then
+                        torso.Color = Color3.fromRGB(255, 0, 0)
+                    end
+                end)
+            end
+        end)
+        
+        -- Colocar detector no personagem
+        detector.Parent = character
+        
+        print("✅ Hitbox ativado - Tamanho: " .. tamanhoHitbox)
+        
+    else
+        -- Desativar: remover detector e restaurar torso
+        local detector = character:FindFirstChild("DetectorHitbox")
+        if detector then
+            detector:Destroy()
+        end
+        
+        if torso and torsoOriginal then
+            torso.Size = torsoOriginal
+            torso.Transparency = 0
+            torso.Color = Color3.fromRGB(255, 255, 255)
+            
+            -- Remover highlight
+            local highlight = torso:FindFirstChild("Highlight")
+            if highlight then
+                highlight:Destroy()
+            end
+        end
+        
+        print("❌ Hitbox desativado")
+    end
+end
+
+-- =========== CRIAR PAINEL ===========
+local function criarPainel()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "PainelHitbox"
+    screenGui.Parent = player:WaitForChild("PlayerGui")
+    screenGui.ResetOnSpawn = false
+    
+    -- Painel principal
+    local painel = Instance.new("Frame")
+    painel.Name = "Painel"
+    painel.Size = UDim2.new(0, 200, 0, 240)
+    painel.Position = UDim2.new(0, 20, 0.5, -120)
+    painel.AnchorPoint = Vector2.new(0, 0.5)
+    painel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    painel.BackgroundTransparency = 0.21
+    painel.BorderSizePixel = 0
+    painel.Active = true
+    painel.Selectable = true
+    
+    -- Arredondar bordas
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = painel
+    
+    -- Borda
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(100, 100, 100)
+    stroke.Thickness = 2
+    stroke.Parent = painel
+    
+    -- Título "HITBOX"
+    local titulo = Instance.new("TextLabel")
+    titulo.Name = "Titulo"
+    titulo.Size = UDim2.new(1, 0, 0, 40)
+    titulo.Position = UDim2.new(0, 0, 0, 10)
+    titulo.Text = "HITBOX"
+    titulo.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titulo.BackgroundTransparency = 1
+    titulo.TextScaled = true
+    titulo.Font = Enum.Font.GothamBold
+    titulo.Parent = painel
+    
+    -- Linha divisória
+    local linha = Instance.new("Frame")
+    linha.Size = UDim2.new(0.9, 0, 0, 2)
+    linha.Position = UDim2.new(0.05, 0, 0, 55)
+    linha.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    linha.BorderSizePixel = 0
+    linha.Parent = painel
+    
+    -- Crédito "feito por Nyz"
+    local credito = Instance.new("TextLabel")
+    credito.Name = "Credito"
+    credito.Size = UDim2.new(1, 0, 0, 15)
+    credito.Position = UDim2.new(0, 0, 0, 60)
+    credito.Text = "feito por Nyz"
+    credito.TextColor3 = Color3.fromRGB(150, 150, 150)
+    credito.BackgroundTransparency = 1
+    credito.TextSize = 11
+    credito.Font = Enum.Font.Gotham
+    credito.TextTransparency = 0.4
+    credito.Parent = painel
+    
+    -- Texto "Tamanho:"
+    local textoSize = Instance.new("TextLabel")
+    textoSize.Name = "TextoSize"
+    textoSize.Size = UDim2.new(1, 0, 0, 30)
+    textoSize.Position = UDim2.new(0, 0, 0, 85)
+    textoSize.Text = "Tamanho:"
+    textoSize.TextColor3 = Color3.fromRGB(200, 200, 200)
+    textoSize.BackgroundTransparency = 1
+    textoSize.TextScaled = true
+    textoSize.Font = Enum.Font.Gotham
+    textoSize.Parent = painel
+    
+    -- Caixa para número do tamanho (começa com 15)
+    local caixaSize = Instance.new("TextBox")
+    caixaSize.Name = "CaixaSize"
+    caixaSize.Size = UDim2.new(0.8, 0, 0, 35)
+    caixaSize.Position = UDim2.new(0.1, 0, 0, 120)
+    caixaSize.Text = tostring(tamanhoHitbox) -- Já começa com 15
+    caixaSize.TextColor3 = Color3.fromRGB(255, 255, 255)
+    caixaSize.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    caixaSize.BackgroundTransparency = 0.3
+    caixaSize.TextScaled = true
+    caixaSize.Font = Enum.Font.Gotham
+    caixaSize.PlaceholderText = "Recomendado: 15"
+    caixaSize.Parent = painel
+    
+    local cornerCaixa = Instance.new("UICorner")
+    cornerCaixa.CornerRadius = UDim.new(0, 5)
+    cornerCaixa.Parent = caixaSize
+    
+    -- Texto "Ativar:"
+    local textoAtivar = Instance.new("TextLabel")
+    textoAtivar.Name = "TextoAtivar"
+    textoAtivar.Size = UDim2.new(1, 0, 0, 30)
+    textoAtivar.Position = UDim2.new(0, 0, 0, 165)
+    textoAtivar.Text = "Ativar:"
+    textoAtivar.TextColor3 = Color3.fromRGB(200, 200, 200)
+    textoAtivar.BackgroundTransparency = 1
+    textoAtivar.TextScaled = true
+    textoAtivar.Font = Enum.Font.Gotham
+    textoAtivar.Parent = painel
+    
+    -- Botão Ativar/Desativar
+    local botaoAtivar = Instance.new("TextButton")
+    botaoAtivar.Name = "BotaoAtivar"
+    botaoAtivar.Size = UDim2.new(0.8, 0, 0, 40)
+    botaoAtivar.Position = UDim2.new(0.1, 0, 0, 195)
+    botaoAtivar.Text = "DESATIVADO"
+    botaoAtivar.TextColor3 = Color3.fromRGB(255, 255, 255)
+    botaoAtivar.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    botaoAtivar.BackgroundTransparency = 0.2
+    botaoAtivar.TextScaled = true
+    botaoAtivar.Font = Enum.Font.GothamBold
+    botaoAtivar.Parent = painel
+    
+    local cornerBotao = Instance.new("UICorner")
+    cornerBotao.CornerRadius = UDim.new(0, 8)
+    cornerBotao.Parent = botaoAtivar
+    
+    -- =========== SISTEMA DE ARRASTE ===========
+    local function iniciarArraste(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            painelArrastando = true
+            offsetMouse = painel.AbsolutePosition - input.Position
+        end
+    end
+    
+    local function pararArraste(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            painelArrastando = false
+            offsetMouse = nil
+        end
+    end
+    
+    local function atualizarArraste(input)
+        if painelArrastando and offsetMouse then
+            local mousePos = input.Position
+            local novaPos = UDim2.new(0, mousePos.X + offsetMouse.X, 0, mousePos.Y + offsetMouse.Y)
+            
+            local viewportSize = workspace.CurrentCamera.ViewportSize
+            
+            if novaPos.X.Offset < 0 then novaPos = UDim2.new(0, 0, novaPos.Y.Scale, novaPos.Y.Offset) end
+            if novaPos.X.Offset + painel.AbsoluteSize.X > viewportSize.X then novaPos = UDim2.new(0, viewportSize.X - painel.AbsoluteSize.X, novaPos.Y.Scale, novaPos.Y.Offset) end
+            if novaPos.Y.Offset < 0 then novaPos = UDim2.new(novaPos.X.Scale, novaPos.X.Offset, 0, 0) end
+            if novaPos.Y.Offset + painel.AbsoluteSize.Y > viewportSize.Y then novaPos = UDim2.new(novaPos.X.Scale, novaPos.X.Offset, 0, viewportSize.Y - painel.AbsoluteSize.Y) end
+            
+            painel.Position = novaPos
+        end
+    end
+    
+    painel.InputBegan:Connect(iniciarArraste)
+    painel.InputEnded:Connect(pararArraste)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            atualizarArraste(input)
+        end
+    end)
+    
+    -- =========== EVENTOS DOS CONTROLES ===========
+    caixaSize.FocusLost:Connect(function()
+        local novoNumero = tonumber(caixaSize.Text)
+        if novoNumero and novoNumero >= 1 then
+            tamanhoHitbox = math.clamp(novoNumero, 1, 100)
+            caixaSize.Text = tostring(tamanhoHitbox)
+            
+            if ativo then
+                hitbox()
+                wait(0.1)
+                hitbox()
+            end
+        else
+            caixaSize.Text = tostring(tamanhoHitbox)
+        end
+    end)
+    
+    botaoAtivar.MouseButton1Click:Connect(function()
+        ativo = not ativo
+        
+        if ativo then
+            botaoAtivar.Text = "ATIVADO"
+            botaoAtivar.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+        else
+            botaoAtivar.Text = "DESATIVADO"
+            botaoAtivar.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        end
+        
+        hitbox()
+    end)
+    
+    painel.Parent = screenGui
+    return screenGui
+end
+
+-- =========== INICIALIZAR ===========
+-- Criar painel
+local painelGui = criarPainel()
+
+-- Mostrar avisos sequenciais
+spawn(mostrarAvisosSequenciais)
+
+-- Quando personagem respawnar
+player.CharacterAdded:Connect(function(novoChar)
+    character = novoChar
+    torsoOriginal = nil
+    
+    if ativo then
+        ativo = false
+        
+        local botao = painelGui:FindFirstChild("Painel") and painelGui.Painel:FindFirstChild("BotaoAtivar")
+        if botao then
+            botao.Text = "DESATIVADO"
+            botao.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        end
+    end
+end)
+
+print("==========================================")
+print("🎯 HITBOX COM DETECÇÃO PERFEITA!")
+print("==========================================")
+print("• Tamanho padrão: 15 (recomendado)")
+print("• Avisos sequenciais com fade")
+print("• Arraste o painel para mover")
+print("• feito por Nyz")
+print("==========================================")
