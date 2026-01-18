@@ -1,7 +1,5 @@
--- PAINEL DE CONTROLE HITBOX - VERSÃO QUE FUNCIONA
 if not game:IsLoaded() then
     game.Loaded:Wait()
-    print("✅ Jogo carregado")
 end
 
 local Players = game:GetService("Players")
@@ -9,359 +7,187 @@ local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 
-print("✅ Personagem carregado")
-
 -- Variáveis
 local ativo = false
 local torsoOriginal
 local tamanhoHitbox = 15
-local arrastando = false
-local offsetMouse = nil
 local painelFrame
 
--- =========== FUNÇÃO HITBOX SIMPLES ===========
+-- =========== FUNÇÃO HITBOX ===========
 local function hitbox()
     local torso = character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso")
-    if not torso then 
-        print("❌ Não encontrou torso")
-        return 
-    end
-    
-    print("📦 Torso encontrado: " .. torso.Name)
-    
+    if not torso then return end
+
     if ativo then
         if not torsoOriginal then
             torsoOriginal = torso.Size
-            print("📏 Tamanho original salvo: " .. tostring(torsoOriginal))
         end
-        
-        print("🎯 Aumentando hitbox para: " .. tamanhoHitbox)
-        
-        -- Aumentar tamanho
+
         torso.Size = Vector3.new(tamanhoHitbox, tamanhoHitbox, tamanhoHitbox)
         torso.Transparency = 0.7
         torso.Color = Color3.fromRGB(255, 0, 0)
-        
-        -- Detecção de toque
+
         torso.Touched:Connect(function(hit)
             if not ativo then return end
-            
             local nome = hit.Name:lower()
-            print("🟡 Toque detectado: " .. nome)
-            
-            local isBola = nome:find("ball") or nome:find("bola") or nome:find("soccer") or nome:find("futebol")
-            
-            if not isBola and hit.Parent then
-                local nomeParent = hit.Parent.Name:lower()
-                isBola = nomeParent:find("ball") or nomeParent:find("bola") or nomeParent:find("soccer")
-            end
-            
-            if isBola then
-                print("⚽ BOLA DETECTADA! Chutando...")
-                
-                -- Calcular direção do chute
-                local direcaoChute = (hit.Position - torso.Position).Unit
-                
-                -- Ajustar altura e força
-                local chuteVertical = 0.5
-                local chuteHorizontal = 0.8
-                
-                local direcaoFinal = Vector3.new(
-                    direcaoChute.X * chuteHorizontal,
-                    chuteVertical,
-                    direcaoChute.Z * chuteHorizontal
-                ).Unit * 100
-                
-                -- Aplicar força
-                local bodyVelocity = Instance.new("BodyVelocity")
-                bodyVelocity.Velocity = direcaoFinal
-                bodyVelocity.MaxForce = Vector3.new(10000, 10000, 10000)
-                
-                local velAntiga = hit:FindFirstChild("BodyVelocity")
-                if velAntiga then velAntiga:Destroy() end
-                
-                bodyVelocity.Parent = hit
-                
-                -- Efeito visual
-                torso.Color = Color3.fromRGB(255, 255, 0)
-                
-                -- Som
-                local som = Instance.new("Sound")
-                som.SoundId = "rbxassetid://3570570104"
-                som.Volume = 0.6
-                som.Parent = hit
-                som:Play()
-                
-                -- Efeito na bola
-                hit.BrickColor = BrickColor.new("Bright yellow")
-                
-                -- Limpar
-                game:GetService("Debris"):AddItem(bodyVelocity, 0.3)
-                game:GetService("Debris"):AddItem(som, 2)
-                
-                -- Voltar cor original
-                delay(0.1, function()
-                    if torso and torso.Parent then
-                        torso.Color = Color3.fromRGB(255, 0, 0)
-                    end
-                    if hit and hit.Parent then
-                        hit.BrickColor = BrickColor.new("Bright red")
-                    end
-                end)
+            if nome:find("ball") or nome:find("bola") or nome:find("soccer") then
+                local dir = (hit.Position - torso.Position).Unit * 100
+                local bv = Instance.new("BodyVelocity")
+                bv.Velocity = Vector3.new(dir.X, 40, dir.Z)
+                bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+                bv.Parent = hit
+                game:GetService("Debris"):AddItem(bv, 0.3)
             end
         end)
-        
-        print("✅ HITBOX ATIVADO - Tamanho: " .. tamanhoHitbox)
-        
     else
-        print("❌ Desativando hitbox...")
-        
-        if torso and torsoOriginal then
+        if torsoOriginal then
             torso.Size = torsoOriginal
             torso.Transparency = 0
-            torso.Color = Color3.fromRGB(255, 255, 255)
-            print("✅ Hitbox restaurado ao tamanho original")
+            torso.Color = Color3.fromRGB(255,255,255)
         end
-        
-        print("❌ Hitbox desativado")
     end
 end
 
--- =========== CRIAR PAINEL VISÍVEL ===========
+-- =========== PAINEL ===========
 local function criarPainel()
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "PainelHitbox"
-    screenGui.Parent = player:WaitForChild("PlayerGui")
-    screenGui.ResetOnSpawn = false
-    
-    print("🎨 Criando painel...")
-    
-    -- Painel principal
+    local gui = Instance.new("ScreenGui", player.PlayerGui)
+    gui.ResetOnSpawn = false
+
     painelFrame = Instance.new("Frame")
     painelFrame.Name = "Painel"
-    painelFrame.Size = UDim2.new(0, 200, 0, 240)
+    painelFrame.Size = UDim2.new(0, 160, 0, 200) -- painel menor
     painelFrame.Position = UDim2.new(0, 20, 0.5, -120)
-    painelFrame.AnchorPoint = Vector2.new(0, 0.5)
-    painelFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    painelFrame.BackgroundTransparency = 0.1 -- MAIS VISÍVEL
+    painelFrame.BackgroundColor3 = Color3.fromRGB(0,0,0)
+    painelFrame.BackgroundTransparency = 0.1
     painelFrame.BorderSizePixel = 0
-    
-    -- Arredondar bordas
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 10)
-    corner.Parent = painelFrame
-    
-    -- Borda BRANCA para ser mais visível
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(255, 255, 255)
+    painelFrame.Parent = gui
+
+    local corner = Instance.new("UICorner", painelFrame)
+    corner.CornerRadius = UDim.new(0,10)
+
+    local stroke = Instance.new("UIStroke", painelFrame)
+    stroke.Color = Color3.fromRGB(255,255,255)
     stroke.Thickness = 3
-    stroke.Parent = painelFrame
-    
-    -- Título "HITBOX" (ÁREA DE ARRASTE)
-    local titulo = Instance.new("TextLabel")
-    titulo.Name = "Titulo"
-    titulo.Size = UDim2.new(1, 0, 0, 40)
-    titulo.Position = UDim2.new(0, 0, 0, 10)
+
+    -- TÍTULO HITBOX (ÁREA DE ARRASTE)
+    local titulo = Instance.new("TextLabel", painelFrame)
+    titulo.Size = UDim2.new(1,0,0,40)
+    titulo.Position = UDim2.new(0,0,0,10)
     titulo.Text = "HITBOX"
-    titulo.TextColor3 = Color3.fromRGB(255, 255, 255)
-    titulo.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    titulo.BackgroundTransparency = 0.5
     titulo.TextScaled = true
     titulo.Font = Enum.Font.GothamBold
+    titulo.TextColor3 = Color3.fromRGB(255,255,255)
+    titulo.BackgroundTransparency = 1 -- sem cinza
     titulo.Active = true
-    titulo.Selectable = true
-    titulo.Parent = painelFrame
-    
-    -- Linha divisória
-    local linha = Instance.new("Frame")
+
+    -- Linha
+    local linha = Instance.new("Frame", painelFrame)
     linha.Size = UDim2.new(0.9, 0, 0, 2)
     linha.Position = UDim2.new(0.05, 0, 0, 55)
-    linha.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    linha.BackgroundColor3 = Color3.fromRGB(255,255,255)
     linha.BorderSizePixel = 0
-    linha.Parent = painelFrame
-    
-    -- Crédito "feito por Nyz"
-    local credito = Instance.new("TextLabel")
-    credito.Name = "Credito"
+
+    -- Crédito
+    local credito = Instance.new("TextLabel", painelFrame)
     credito.Size = UDim2.new(1, 0, 0, 15)
     credito.Position = UDim2.new(0, 0, 0, 60)
     credito.Text = "feito por Nyz"
-    credito.TextColor3 = Color3.fromRGB(200, 200, 200)
+    credito.TextColor3 = Color3.fromRGB(200,200,200)
     credito.BackgroundTransparency = 1
     credito.TextSize = 12
     credito.Font = Enum.Font.Gotham
-    credito.Parent = painelFrame
-    
-    -- Texto "Tamanho:"
-    local textoSize = Instance.new("TextLabel")
-    textoSize.Name = "TextoSize"
-    textoSize.Size = UDim2.new(1, 0, 0, 30)
-    textoSize.Position = UDim2.new(0, 0, 0, 85)
+
+    -- Texto tamanho
+    local textoSize = Instance.new("TextLabel", painelFrame)
+    textoSize.Size = UDim2.new(1,0,0,30)
+    textoSize.Position = UDim2.new(0,0,0,80)
     textoSize.Text = "Tamanho:"
-    textoSize.TextColor3 = Color3.fromRGB(255, 255, 255)
+    textoSize.TextColor3 = Color3.fromRGB(255,255,255)
     textoSize.BackgroundTransparency = 1
     textoSize.TextScaled = true
     textoSize.Font = Enum.Font.Gotham
-    textoSize.Parent = painelFrame
-    
-    -- Caixa para número do tamanho
-    local caixaSize = Instance.new("TextBox")
-    caixaSize.Name = "CaixaSize"
-    caixaSize.Size = UDim2.new(0.8, 0, 0, 35)
-    caixaSize.Position = UDim2.new(0.1, 0, 0, 120)
-    caixaSize.Text = tostring(tamanhoHitbox)
-    caixaSize.TextColor3 = Color3.fromRGB(255, 255, 255)
-    caixaSize.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    caixaSize.BackgroundTransparency = 0
-    caixaSize.TextScaled = true
+
+    -- Caixa tamanho
+    local caixaSize = Instance.new("TextBox", painelFrame)
+    caixaSize.Size = UDim2.new(0.8,0,0,35)
+    caixaSize.Position = UDim2.new(0.1,0,0,110)
+    caixaSize.Text = ""
+    caixaSize.PlaceholderText = "Recomendado 15"
+    caixaSize.PlaceholderColor3 = Color3.fromRGB(170,170,170)
+    caixaSize.TextColor3 = Color3.fromRGB(255,255,255)
+    caixaSize.TextScaled = false
+    caixaSize.TextSize = 14
     caixaSize.Font = Enum.Font.Gotham
-    caixaSize.PlaceholderText = "15"
-    caixaSize.Parent = painelFrame
-    
-    local cornerCaixa = Instance.new("UICorner")
-    cornerCaixa.CornerRadius = UDim.new(0, 5)
-    cornerCaixa.Parent = caixaSize
-    
-    -- Texto "Ativar:"
-    local textoAtivar = Instance.new("TextLabel")
-    textoAtivar.Name = "TextoAtivar"
-    textoAtivar.Size = UDim2.new(1, 0, 0, 30)
-    textoAtivar.Position = UDim2.new(0, 0, 0, 165)
-    textoAtivar.Text = "Ativar:"
-    textoAtivar.TextColor3 = Color3.fromRGB(255, 255, 255)
-    textoAtivar.BackgroundTransparency = 1
-    textoAtivar.TextScaled = true
-    textoAtivar.Font = Enum.Font.Gotham
-    textoAtivar.Parent = painelFrame
-    
-    -- Botão Ativar/Desativar
-    local botaoAtivar = Instance.new("TextButton")
-    botaoAtivar.Name = "BotaoAtivar"
-    botaoAtivar.Size = UDim2.new(0.8, 0, 0, 40)
-    botaoAtivar.Position = UDim2.new(0.1, 0, 0, 195)
-    botaoAtivar.Text = "DESATIVADO"
-    botaoAtivar.TextColor3 = Color3.fromRGB(255, 255, 255)
-    botaoAtivar.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    botaoAtivar.BackgroundTransparency = 0
-    botaoAtivar.TextScaled = true
-    botaoAtivar.Font = Enum.Font.GothamBold
-    botaoAtivar.Parent = painelFrame
-    
-    local cornerBotao = Instance.new("UICorner")
-    cornerBotao.CornerRadius = UDim.new(0, 8)
-    cornerBotao.Parent = botaoAtivar
-    
-    -- =========== SISTEMA DE ARRASTE ===========
+    caixaSize.BackgroundColor3 = Color3.fromRGB(30,30,30)
+
+    local c1 = Instance.new("UICorner", caixaSize)
+    c1.CornerRadius = UDim.new(0,5)
+
+    -- Botão
+    local botao = Instance.new("TextButton", painelFrame)
+    botao.Size = UDim2.new(0.8,0,0,40)
+    botao.Position = UDim2.new(0.1,0,0,150)
+    botao.Text = "DESATIVADO"
+    botao.TextScaled = true
+    botao.Font = Enum.Font.GothamBold
+    botao.TextColor3 = Color3.fromRGB(255,255,255)
+    botao.BackgroundColor3 = Color3.fromRGB(200,50,50)
+
+    local c2 = Instance.new("UICorner", botao)
+    c2.CornerRadius = UDim.new(0,8)
+
+    -- =========== ARRASTE (SÓ NO HITBOX) ===========
+    local dragging = false
+    local dragStart
+    local startPos
+
+    local function update(input)
+        local delta = input.Position - dragStart
+        painelFrame.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+
     titulo.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            arrastando = true
-            offsetMouse = painelFrame.AbsolutePosition - input.Position
-            painelFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-            print("🖱️ Iniciando arraste...")
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = painelFrame.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
         end
     end)
-    
-    titulo.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            arrastando = false
-            offsetMouse = nil
-            painelFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-            print("✅ Arraste finalizado")
-        end
-    end)
-    
+
     UserInputService.InputChanged:Connect(function(input)
-        if arrastando and offsetMouse then
-            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-                local mousePos = input.Position
-                local novaPos = UDim2.new(
-                    0, mousePos.X + offsetMouse.X,
-                    0, mousePos.Y + offsetMouse.Y
-                )
-                
-                painelFrame.Position = novaPos
-            end
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch) then
+            update(input)
         end
     end)
-    
-    -- =========== EVENTOS DOS CONTROLES ===========
+
+    -- Eventos
     caixaSize.FocusLost:Connect(function()
-        local novoNumero = tonumber(caixaSize.Text)
-        if novoNumero and novoNumero >= 1 then
-            tamanhoHitbox = math.clamp(novoNumero, 1, 100)
-            caixaSize.Text = tostring(tamanhoHitbox)
-            
-            if ativo then
-                hitbox()
-            end
-        else
-            caixaSize.Text = tostring(tamanhoHitbox)
+        local n = tonumber(caixaSize.Text)
+        if n then
+            tamanhoHitbox = math.clamp(n,1,100)
+            if ativo then hitbox() end
         end
     end)
-    
-    botaoAtivar.MouseButton1Click:Connect(function()
+
+    botao.MouseButton1Click:Connect(function()
         ativo = not ativo
-        
-        if ativo then
-            botaoAtivar.Text = "ATIVADO"
-            botaoAtivar.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-        else
-            botaoAtivar.Text = "DESATIVADO"
-            botaoAtivar.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        end
-        
+        botao.Text = ativo and "ATIVADO" or "DESATIVADO"
+        botao.BackgroundColor3 = ativo and Color3.fromRGB(50,200,50) or Color3.fromRGB(200,50,50)
         hitbox()
     end)
-    
-    painelFrame.Parent = screenGui
-    print("✅ Painel criado com sucesso!")
-    return screenGui
 end
 
--- =========== INICIALIZAR ===========
-wait(1) -- Esperar um pouco
-local painelGui = criarPainel()
-
--- Aviso simples
-local avisoGui = Instance.new("ScreenGui", player.PlayerGui)
-local aviso = Instance.new("TextLabel", avisoGui)
-aviso.Size = UDim2.new(0.8, 0, 0.08, 0)
-aviso.Position = UDim2.new(0.1, 0, 0.05, 0)
-aviso.Text = "HITBOX ATIVO - feito por Nyz"
-aviso.TextColor3 = Color3.fromRGB(255, 255, 255)
-aviso.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
-aviso.BackgroundTransparency = 0.3
-aviso.TextScaled = true
-aviso.Visible = true
-
-delay(3, function()
-    aviso.Visible = false
-end)
-
-player.CharacterAdded:Connect(function(novoChar)
-    print("♻️ Personagem respawnou")
-    character = novoChar
-    torsoOriginal = nil
-    
-    if ativo then
-        ativo = false
-        
-        local botao = painelGui:FindFirstChild("Painel") and painelGui.Painel:FindFirstChild("BotaoAtivar")
-        if botao then
-            botao.Text = "DESATIVADO"
-            botao.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        end
-    end
-end)
-
-print("==========================================")
-print("🎮 HITBOX - VERSÃO FUNCIONAL")
-print("==========================================")
-print("• Painel PRETO com borda BRANCA")
-print("• Texto 'HITBOX' no topo (arraste aqui)")
-print("• Botão verde/vermelho")
-print("• Aviso inicial por 3 segundos")
-print("• feito por Nyz")
-print("==========================================")
-print("✅ Script executado com sucesso!")
-print("👈 Procure o painel preto na tela")
+criarPainel()
